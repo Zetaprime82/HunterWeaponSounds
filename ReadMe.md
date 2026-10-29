@@ -50,3 +50,5 @@ Using the menu :
 | /hws | Open the menu |
 | /hws minimap | Show or hide the minimap button |
 | /hws options | Open the Options → AddOns page |
+
+![Menu](https://raw.githubusercontent.com/Zetaprime82/Blizzard-API/refs/heads/master/HunterWeaponSounds.png)
