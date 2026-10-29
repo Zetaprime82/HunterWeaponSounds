@@ -13,8 +13,32 @@ Features :
 - **Manual override:** *force Gun, Bow or Crossbow sounds if detection is ever wrong*.
 - **Minimap button:** *open the menu or turn the addon on or off from the minimap. You can hide the button in the menu*.
 
-Usage :
+Opening the menu :
 --------------------
-- Click the minimap icon, or type `/duf` or `/dressupframe`, to open the scale menu.
-- Type `/duf minimap` to show or hide the minimap button.
+- Type `/hws` to open the scale menu.
+- Go to Options → AddOns → Hunter Weapon Sounds
+- Click the minimap button (left-click opens the menu, right-click turns the addon on or off, drag to move it)
 
+
+Using the menu :
+--------------------
+- Enabled: turns the addon on or off. Off restores the game’s own sounds.
+- Mute the game’s own sounds: stops the stock gun, bow and crossbow sounds from playing alongside yours.
+- Follow transmog: uses the sounds of what the weapon looks like instead of the real item.
+- Show minimap button: shows or hides the button.
+- Channel: the sound channel (SFX, Master, Ambience or Dialog). SFX follows your Sound Effects volume.
+- Weapon type: Auto detects your weapon. Click to force Gun, Bow or Crossbow.
+- Gun / Bow / Crossbow tabs: choose which weapon’s sounds you are editing.
+- Shoot and reload slots: each of the 3 slots can be changed with the List button or by typing a name and pressing Enter. Play previews it, and an empty slot is silent.
+- Reload plays … seconds after the shot: sets how long after the shot the reload sound plays.
+- Test shoot + reload: plays the full pair for the selected weapon.
+- Reset to defaults: restores that weapon’s original sounds.
+
+Adding your own sounds :
+--------------------
+1. Copy your .ogg or .mp3 file into HunterWeaponSounds\CustomSounds\.
+2. Restart the game fully. WoW only sees new files when it starts, so /reload is not enough.
+3. In the menu, type the file name under Add a custom sound and press Add.
+4. Pick it for any slot with the List button. Custom sounds can be removed from the list with the red X.
+
+`You can also type a game sound ID (a number) or a full file path instead of a file name.`
