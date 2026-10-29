@@ -45,8 +45,8 @@ Adding your own sounds :
 
 Using the menu :
 --------------------
-| Syntax                      | Output                                                                                                                                                                         |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Syntax                      | Output |
+| --------------------------- | -------- |
 | /hws | Open the menu |
 | /hws minimap | Show or hide the minimap button |
 | /hws options | Open the Options → AddOns page |
