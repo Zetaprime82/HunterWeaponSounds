@@ -42,3 +42,11 @@ Adding your own sounds :
 4. Pick it for any slot with the List button. Custom sounds can be removed from the list with the red X.
 
 `You can also type a game sound ID (a number) or a full file path instead of a file name.`
+
+Using the menu :
+--------------------
+| Syntax                      | Output                                                                                                                                                                         |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| /hws | Open the menu |
+| /hws minimap | Show or hide the minimap button |
+| /hws options | Open the Options → AddOns page |
