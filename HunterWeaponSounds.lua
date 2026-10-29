@@ -354,21 +354,52 @@ local function SourceToType(sourceID, trace)
     return nil
 end
 
+-- Compact one-level dump of a value for the diagnostic report
+local function Dump(v)
+    if type(v) ~= "table" then
+        local ok, str = pcall(tostring, v)
+        return ok and (type(v) .. ":" .. str) or "?"
+    end
+    local parts = {}
+    for k, val in pairs(v) do
+        if type(val) ~= "table" and type(val) ~= "function" then
+            local ok, str = pcall(tostring, val)
+            parts[#parts + 1] = tostring(k) .. "=" .. (ok and str or "?")
+        end
+    end
+    table.sort(parts)
+    return "{" .. table.concat(parts, ", ") .. "}"
+end
+
+-- The transmog "location" argument. TransmogUtil is not always loaded (on Retail
+-- it can be missing until the Collections window has been opened), so a plain
+-- table with the same fields is offered as well.
+local function BuildLocations(slot)
+    local list = {}
+    local E = Enum or {}
+    local tType = (E.TransmogType and E.TransmogType.Appearance) or 0
+    local tMod = (E.TransmogModification and E.TransmogModification.Main) or 0
+    if TransmogUtil and TransmogUtil.GetTransmogLocation then
+        local ok, loc = SafeCall(TransmogUtil.GetTransmogLocation, slot, tType, tMod)
+        if ok and loc then list[#list + 1] = { loc, "TransmogUtil" } end
+    end
+    list[#list + 1] = { { slotID = slot, type = tType, modification = tMod }, "plain table" }
+    return list
+end
+
 -- Method A: C_Transmog.GetSlotVisualInfo (retail style)
 local function MethodSlotVisual(slot, trace)
-    if not (C_Transmog and C_Transmog.GetSlotVisualInfo and TransmogUtil and TransmogUtil.GetTransmogLocation
-        and Enum and Enum.TransmogType and Enum.TransmogModification) then
-        Note(trace, "A: GetSlotVisualInfo API not present")
+    if not (C_Transmog and C_Transmog.GetSlotVisualInfo) then
+        Note(trace, "A: C_Transmog.GetSlotVisualInfo not present")
         return nil
     end
     local tried = {}
     for _, sl in ipairs({ slot, 16, 18 }) do
         if not tried[sl] then
             tried[sl] = true
-            local okL, loc = SafeCall(TransmogUtil.GetTransmogLocation, sl,
-                Enum.TransmogType.Appearance, Enum.TransmogModification.Main)
-            if okL and loc then
-                local ok, r1, _, r3, _, _, _, _, r8 = SafeCall(C_Transmog.GetSlotVisualInfo, loc)
+            for _, entry in ipairs(BuildLocations(sl)) do
+                local loc, how = entry[1], entry[2]
+                local ok, r1, r2, r3, r4, r5, r6, r7, r8 = SafeCall(C_Transmog.GetSlotVisualInfo, loc)
                 if ok and r1 ~= nil then
                     local applied, hidden
                     if type(r1) == "table" then
@@ -376,16 +407,16 @@ local function MethodSlotVisual(slot, trace)
                     else
                         applied, hidden = Num(r3), r8
                     end
-                    Note(trace, ("A: slot %d applied=%s hidden=%s"):format(sl, tostring(applied), tostring(hidden)))
+                    Note(trace, ("A: slot %d via %s -> %s applied=%s hidden=%s"):format(
+                        sl, how, type(r1) == "table" and Dump(r1) or Dump(r1) .. "," .. Dump(r2) .. "," .. Dump(r3),
+                        tostring(applied), tostring(hidden)))
                     if applied and applied ~= 0 and not hidden then
                         local t = SourceToType(applied, trace)
                         if t then return t end
                     end
                 else
-                    Note(trace, ("A: slot %d GetSlotVisualInfo gave nothing"):format(sl))
+                    Note(trace, ("A: slot %d via %s -> %s"):format(sl, how, ok and "returned nothing" or "error"))
                 end
-            else
-                Note(trace, ("A: slot %d no transmog location"):format(sl))
             end
         end
     end
@@ -454,6 +485,15 @@ local function MethodTooltip(slot, trace)
             local okI, id = SafeCall(getInstant, found)
             if okI then t = InstantType(id) end
         end
+        if not t then
+            local getInfo = (C_Item and C_Item.GetItemInfo) or GetItemInfo
+            if getInfo then
+                local okG, r = pcall(function() return { getInfo(found) } end)
+                if okG and type(r) == "table" and r[12] == 2 and WEAPON_SUBCLASS[r[13]] then
+                    t = WEAPON_SUBCLASS[r[13]]
+                end
+            end
+        end
         Note(trace, ("C: tooltip says transmogrified to '%s' -> %s"):format(tostring(found), tostring(t)))
         return t
     end
@@ -465,25 +505,77 @@ local function AppearanceType(slot, trace)
     return MethodSlotVisual(slot, trace) or MethodOutfit(slot, trace) or MethodTooltip(slot, trace)
 end
 
+-- Detection results are cached for a few seconds (and cleared whenever your
+-- gear changes) so firing a shot never does the full lookup every time.
+local cache = {}
+function ns.InvalidateDetectCache() cache.t = nil end
+
 -- returns final, real, appearance, trace
 -- (final is nil if no hunter ranged weapon is equipped)
 function ns.DetectWeapon(wantTrace)
     local trace = wantTrace and {} or nil
-    for _, slot in ipairs(SLOTS) do
-        local real = RealType(slot)
-        if real then
-            Note(trace, ("equipped in slot %d: %s"):format(slot, real:lower()))
-            local look = db.useTransmog and AppearanceType(slot, trace) or nil
-            local final = real
-            if db.forceType ~= "AUTO" and ns.WEAPON_LABEL[db.forceType] then
-                final = db.forceType
-            elseif look then
-                final = look
+    local real, look
+    local now = GetTime and GetTime() or 0
+    if not wantTrace and cache.t and (now - cache.t) < 3 and cache.useT == db.useTransmog then
+        real, look = cache.real, cache.look
+    else
+        for _, slot in ipairs(SLOTS) do
+            local r = RealType(slot)
+            if r then
+                real = r
+                Note(trace, ("equipped in slot %d: %s"):format(slot, r:lower()))
+                look = db.useTransmog and AppearanceType(slot, trace) or nil
+                break
             end
-            return final, real, look, trace
+        end
+        if not wantTrace then
+            cache.t, cache.useT, cache.real, cache.look = now, db.useTransmog, real, look
         end
     end
-    return nil, nil, nil, trace
+    if not real then return nil, nil, nil, trace end
+    local final = real
+    if db.forceType ~= "AUTO" and ns.WEAPON_LABEL[db.forceType] then
+        final = db.forceType
+    elseif look then
+        final = look
+    end
+    return final, real, look, trace
+end
+
+-- Text report that can be copied from the menu (Weapon report button)
+function ns.BuildReport()
+    local L = {}
+    local function add(t) L[#L + 1] = t end
+    local ver, build, _, iface = "?", "?", "?", "?"
+    if GetBuildInfo then ver, build, _, iface = GetBuildInfo() end
+    add("Hunter Weapon Sounds report")
+    add(("client %s build %s interface %s"):format(tostring(ver), tostring(build), tostring(iface)))
+    add(("settings: followTransmog=%s forceType=%s enabled=%s"):format(
+        tostring(db.useTransmog), tostring(db.forceType), tostring(db.enabled)))
+    local function has(v) return v and "yes" or "NO" end
+    add("APIs: TransmogUtil=" .. has(TransmogUtil and TransmogUtil.GetTransmogLocation)
+        .. " GetSlotVisualInfo=" .. has(C_Transmog and C_Transmog.GetSlotVisualInfo)
+        .. " GetItemIDForSource=" .. has(C_Transmog and C_Transmog.GetItemIDForSource)
+        .. " GetSourceInfo=" .. has(C_TransmogCollection and C_TransmogCollection.GetSourceInfo)
+        .. " GetAppearanceSourceInfo=" .. has(C_TransmogCollection and C_TransmogCollection.GetAppearanceSourceInfo)
+        .. " OutfitInfo=" .. has(C_TransmogOutfitInfo)
+        .. " TooltipInfo=" .. has(C_TooltipInfo and C_TooltipInfo.GetInventoryItem)
+        .. " GetItemInfoInstant=" .. has((C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant))
+    local getInstant = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
+    for _, slot in ipairs({ 16, 17, 18 }) do
+        local id = GetInventoryItemID and GetInventoryItemID("player", slot)
+        local cls, sub = "-", "-"
+        if id and getInstant then
+            local _, _, _, _, _, c, sc = getInstant(id)
+            cls, sub = tostring(c), tostring(sc)
+        end
+        add(("slot %d: itemID=%s class=%s subclass=%s"):format(slot, tostring(id), cls, sub))
+    end
+    add("--- detection ---")
+    local final, real, look, trace = ns.DetectWeapon(true)
+    for _, line in ipairs(trace or {}) do add(line) end
+    add(("RESULT equipped=%s looks like=%s using=%s"):format(tostring(real), tostring(look), tostring(final)))
+    return table.concat(L, "\n")
 end
 
 function ns.GetWeaponType()
@@ -502,9 +594,17 @@ frame:SetScript("OnEvent", function(self, event, ...)
         self:UnregisterEvent("ADDON_LOADED")
         self:RegisterEvent("PLAYER_LOGIN")
         self:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
+        for _, e in ipairs({ "PLAYER_EQUIPMENT_CHANGED", "TRANSMOGRIFY_SUCCESS", "TRANSMOG_COLLECTION_UPDATED",
+                             "TRANSMOG_OUTFITS_CHANGED", "PLAYER_ENTERING_WORLD" }) do
+            pcall(self.RegisterEvent, self, e)
+        end
         if ns.InitOptions then ns.InitOptions() end
     elseif event == "PLAYER_LOGIN" then
         ns.ApplyMute()
+    elseif event == "PLAYER_EQUIPMENT_CHANGED" or event == "TRANSMOGRIFY_SUCCESS"
+        or event == "TRANSMOG_COLLECTION_UPDATED" or event == "TRANSMOG_OUTFITS_CHANGED"
+        or event == "PLAYER_ENTERING_WORLD" then
+        ns.InvalidateDetectCache()
     elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
         if not db.enabled then return end
         local _, _, spellID = ...
@@ -559,7 +659,7 @@ SlashCmdList["HUNTERWEAPONSOUNDS"] = function(msg)
         end
     elseif cmd == "transmog" then
         if arg == "on" or arg == "off" then
-            db.useTransmog = (arg == "on")
+            db.useTransmog = (arg == "on"); ns.InvalidateDetectCache()
             ns.Print("sounds follow transmog appearance: " .. arg)
         else
             ns.Print("usage: /hws transmog on|off")
@@ -572,6 +672,8 @@ SlashCmdList["HUNTERWEAPONSOUNDS"] = function(msg)
         else
             ns.Print("usage: /hws type auto|gun|bow|crossbow")
         end
+    elseif cmd == "report" then
+        if ns.ShowReport then ns.ShowReport(ns.BuildReport()) end
     elseif cmd == "detect" then
         local final, real, look, trace = ns.DetectWeapon(true)
         for _, line in ipairs(trace or {}) do ns.Print(line) end
@@ -591,7 +693,7 @@ SlashCmdList["HUNTERWEAPONSOUNDS"] = function(msg)
         end
     else
         ns.Print("/hws  open the menu   |  /hws options  open Options > AddOns page")
-        ns.Print("/hws on | off | test | mute on|off | transmog on|off | type auto|gun|bow|crossbow | detect | debug | addspell <id> | removespell <id> | minimap")
+        ns.Print("/hws on | off | test | mute on|off | transmog on|off | type auto|gun|bow|crossbow | detect | report | debug | addspell <id> | removespell <id> | minimap")
         ns.Print(("status: %s, mute defaults: %s, current weapon: %s"):format(
             db.enabled and "on" or "off", db.mute and "on" or "off",
             (ns.GetWeaponType() or "none"):lower()))
