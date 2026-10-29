@@ -1,15 +1,17 @@
-# DressUpFrame
+# Hunter Weapon Sounds
 
-*Makes the Dressing Room window bigger. By default it’s scaled up to 1.3x, so your gear previews are easier to see, and you can change that size whenever you like.*
+*Give your hunter’s guns, bows and crossbows a new sound. Hunter Weapon Sounds replaces the shoot and reload sounds of your ranged weapon with 3 shoot sounds and 3 reload sounds for each weapon type. A built-in menu lets you change every sound, and you can add your own.*
 
 Features :
 -----------------
-- **Bigger Dressing Room:** *the window opens enlarged by default (1.3x).*
-- **Custom scale:** *pick any size from 0 to 10 with a slider, or type an exact number into the box and press Enter.*
-- **Minimap button:** *left-click it to open the settings menu, right-click it to open the dressing room, and drag it to put it wherever you want on the minimap edge. It also works with square minimaps.*
-- **Hide the button:** *untick “Show minimap button” in the menu if you’d rather not have it.*
-- **Remembers your choices:** *the button’s position and whether it’s shown are saved between sessions.*
-- **No libraries:** *it’s one small, self-contained addon*
+- **Gun, Bow and Crossbow each have their own 3 shoot sounds and 3 reload sounds.
+- **Random variation: one of the 3 sounds is picked each shot and never repeats back to back. The reload sound plays a moment after the shot.
+- **Stock sounds muted: the game’s own gun, bow and crossbow sounds are muted so you only hear the new ones. You can switch this off.
+- **In-game menu: change any sound slot, set the reload timing per weapon, preview sounds, and reset a weapon to its defaults.
+- **Your own sounds: add .ogg or .mp3 files, a game sound ID, or a file path.
+- **Transmog support: the sounds match how your weapon looks, so a bow transmogged to look like a gun plays gun sounds.
+- **Manual override: force Gun, Bow or Crossbow sounds if detection is ever wrong.
+- **Minimap button: open the menu or turn the addon on or off from the minimap. You can hide the button in the menu.
 
 Usage :
 --------------------
