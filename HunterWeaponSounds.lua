@@ -124,7 +124,14 @@ local function InitDB()
     db = HunterWeaponSoundsDB
     if db.enabled == nil then db.enabled = true end
     if db.mute == nil then db.mute = true end
-    if db.muteAll == nil then db.muteAll = false end
+    -- Version 1.7 - 1.9.3 only muted the stock sound in short windows around your own
+    -- shots. That made sounds unreliable, so the stock sounds are muted all the time again
+    -- (as in 1.6.2). Saved settings from those versions are switched back once.
+    if (db.dbVersion or 0) < 2 then
+        db.muteAll = true
+        db.dbVersion = 2
+    end
+    if db.muteAll == nil then db.muteAll = true end
     db.channel = db.channel or "SFX"
     if db.useTransmog == nil then db.useTransmog = true end
     db.forceType = db.forceType or "AUTO"
@@ -183,6 +190,9 @@ function ns.PlayEntry(entry)
     local target = ns.Resolve(entry)
     if not target then return false end
     local ok, willPlay = pcall(PlaySoundFile, target, db and db.channel or "SFX")
+    if ns.debugCasts then
+        ns.Print(("played %s -> %s"):format(tostring(entry), (ok and willPlay) and "ok" or "NOT played by the game (willPlay=" .. tostring(willPlay) .. ")"))
+    end
     return ok and (willPlay ~= false)
 end
 
@@ -230,6 +240,7 @@ end
 function ns.SetSlot(weapon, kind, i, value)
     value = (value or ""):gsub("^%s+", ""):gsub("%s+$", "")
     db.weapons[weapon][kind][i] = value
+    if tonumber(value) then ns.ApplyMute(true) end
 end
 
 function ns.SetDelay(weapon, value)
@@ -241,6 +252,7 @@ end
 
 function ns.ResetWeapon(weapon)
     db.weapons[weapon] = CopyDefaults(weapon)
+    ns.ApplyMute(true)
 end
 
 function ns.FindCustom(name)
@@ -257,6 +269,7 @@ function ns.AddCustom(name)
     if ns.FindCustom(name) then return false, "Already in your list." end
     local willPlay = ns.PlayEntry(name)
     table.insert(db.custom, name)
+    if tonumber(name) then ns.ApplyMute(true) end
     if willPlay then
         return true, "Added. (Playing it now.)"
     end
@@ -266,24 +279,49 @@ end
 function ns.RemoveCustom(name)
     local i = ns.FindCustom(name)
     if i then table.remove(db.custom, i) end
+    ns.ApplyMute(true)
 end
 
 -- Muting the game's own weapon sound.
--- The stock sounds are shared by every player and NPC, so muting them all the
--- time would silence other hunters standing next to you. By default they are
--- therefore muted only in short windows around YOUR OWN shots. Turn on
--- "mute for everyone" (db.muteAll) to mute them permanently instead.
+-- By default (db.muteAll) the stock sounds are muted all the time, which is the
+-- reliable way: they are shared by every player and NPC, so other players' guns,
+-- bows and crossbows are quiet too. /hws muteall off switches to an experimental
+-- mode that mutes them only in short windows around YOUR OWN shots.
 local windowActive = false
 local windowToken, predictToken = 0, 0
 
 -- force = true re-sends the mute/unmute to the game even if nothing changed
 -- (mutes can survive a /reload on the game's side)
+-- Game sound IDs that YOU use as custom sounds (typed as a number in a slot or
+-- in your custom list) are never muted: muting the stock sound with that ID
+-- would also silence your own sound.
+local function UsedIDs()
+    local used = {}
+    for _, w in ipairs(ns.WEAPONS) do
+        local cfg = db.weapons and db.weapons[w]
+        if cfg then
+            for _, kind in ipairs({ "shoot", "reload" }) do
+                for i = 1, 3 do
+                    local n = tonumber(cfg[kind][i])
+                    if n then used[n] = true end
+                end
+            end
+        end
+    end
+    for _, e in ipairs(db.custom or {}) do
+        local n = tonumber(e)
+        if n then used[n] = true end
+    end
+    return used
+end
+
 function ns.ApplyMute(force)
     if not MuteSoundFile or not UnmuteSoundFile then return end
     local want = (db.enabled and db.mute and (db.muteAll or windowActive)) and true or false
     if want == mutedNow and not force then return end
+    local used = UsedIDs()
     for _, id in ipairs(MUTE_IDS) do
-        if want then MuteSoundFile(id) else UnmuteSoundFile(id) end
+        if want and not used[id] then MuteSoundFile(id) else UnmuteSoundFile(id) end
     end
     mutedNow = want
 end
@@ -322,6 +360,7 @@ end
 -- and again just before the next auto shot is due (so it is already muted when
 -- that shot's sound would start).
 function ns.OwnShotMute()
+    if db.muteAll then return end -- already muted all the time, nothing to do
     OpenMuteWindow(0.5)
     predictToken = predictToken + 1
     local token = predictToken
@@ -753,8 +792,8 @@ SlashCmdList["HUNTERWEAPONSOUNDS"] = function(msg)
     elseif cmd == "muteall" then
         if arg == "on" or arg == "off" then
             db.muteAll = (arg == "on"); ns.ApplyMute(true)
-            ns.Print(db.muteAll and "stock weapon sounds muted for everyone (nearby players go silent)"
-                or "stock weapon sounds muted only around your own shots (other players sound normal)")
+            ns.Print(db.muteAll and "stock weapon sounds muted all the time (other players' weapons are quiet too)"
+                or "EXPERIMENTAL: stock weapon sounds muted only around your own shots (other players keep their sounds; timing may let stock sounds through)")
         else
             ns.Print("usage: /hws muteall on|off")
         end

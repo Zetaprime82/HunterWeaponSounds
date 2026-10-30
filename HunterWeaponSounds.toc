@@ -2,7 +2,7 @@
 ## Title: Hunter Weapon Sounds
 ## Notes: Custom shoot and reload sounds for hunter guns, bows and crossbows, with a menu to change them and add your own. /hws
 ## Author: Zetaprime82
-## Version: 1.9.2
+## Version: 1.9.4
 ## SavedVariables: HunterWeaponSoundsDB
 ## IconTexture: Interface\Icons\Ability_Marksmanship
 ## AddonCompartmentFunc: HunterWeaponSounds_OnCompartmentClick

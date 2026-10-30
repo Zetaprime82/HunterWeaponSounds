@@ -175,7 +175,7 @@ local function BuildPanel(parent)
     local cbMute = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
     cbMute:SetPoint("TOPLEFT", 150, -66)
     cbMute:SetSize(26, 26)
-    Label(parent, "Mute the game's own sound on my shots", 178, -71)
+    Label(parent, "Mute the game's own gun/bow/crossbow sounds", 178, -71)
     cbMute:SetScript("OnClick", function(self)
         ns.db.mute = self:GetChecked() and true or false
         ns.ApplyMute()
