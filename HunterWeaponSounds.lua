@@ -124,6 +124,7 @@ local function InitDB()
     db = HunterWeaponSoundsDB
     if db.enabled == nil then db.enabled = true end
     if db.mute == nil then db.mute = true end
+    if db.muteAll == nil then db.muteAll = false end
     db.channel = db.channel or "SFX"
     if db.useTransmog == nil then db.useTransmog = true end
     db.forceType = db.forceType or "AUTO"
@@ -267,14 +268,66 @@ function ns.RemoveCustom(name)
     if i then table.remove(db.custom, i) end
 end
 
-function ns.ApplyMute()
+-- Muting the game's own weapon sound.
+-- The stock sounds are shared by every player and NPC, so muting them all the
+-- time would silence other hunters standing next to you. By default they are
+-- therefore muted only in short windows around YOUR OWN shots. Turn on
+-- "mute for everyone" (db.muteAll) to mute them permanently instead.
+local windowActive = false
+local windowToken, predictToken = 0, 0
+
+-- force = true re-sends the mute/unmute to the game even if nothing changed
+-- (mutes can survive a /reload on the game's side)
+function ns.ApplyMute(force)
     if not MuteSoundFile or not UnmuteSoundFile then return end
-    local want = (db.enabled and db.mute) and true or false
-    if want == mutedNow then return end
+    local want = (db.enabled and db.mute and (db.muteAll or windowActive)) and true or false
+    if want == mutedNow and not force then return end
     for _, id in ipairs(MUTE_IDS) do
         if want then MuteSoundFile(id) else UnmuteSoundFile(id) end
     end
     mutedNow = want
+end
+
+local function OpenMuteWindow(duration)
+    if not (db.enabled and db.mute) or db.muteAll then return end
+    windowActive = true
+    ns.ApplyMute()
+    windowToken = windowToken + 1
+    local token = windowToken
+    C_Timer.After(duration, function()
+        if token == windowToken then
+            windowActive = false
+            ns.ApplyMute()
+        end
+    end)
+end
+
+local function ShotSpeed()
+    local speed
+    if UnitRangedDamage then
+        local ok, v = pcall(UnitRangedDamage, "player")
+        if ok then speed = v end
+    end
+    if not speed or speed == 0 then
+        if UnitAttackSpeed then
+            local ok, v = pcall(UnitAttackSpeed, "player")
+            if ok then speed = v end
+        end
+    end
+    if type(speed) ~= "number" or (issecretvalue and issecretvalue(speed)) then speed = 2.5 end
+    return math.max(0.6, math.min(6, speed))
+end
+
+-- Called when one of your own shots starts / fires. Mutes the stock sound now,
+-- and again just before the next auto shot is due (so it is already muted when
+-- that shot's sound would start).
+function ns.OwnShotMute()
+    OpenMuteWindow(0.5)
+    predictToken = predictToken + 1
+    local token = predictToken
+    C_Timer.After(math.max(0.1, ShotSpeed() - 0.3), function()
+        if token == predictToken then OpenMuteWindow(0.9) end
+    end)
 end
 
 -- What the item really is (its stats / item class)
@@ -594,13 +647,28 @@ frame:SetScript("OnEvent", function(self, event, ...)
         self:UnregisterEvent("ADDON_LOADED")
         self:RegisterEvent("PLAYER_LOGIN")
         self:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
+        pcall(self.RegisterUnitEvent, self, "UNIT_SPELLCAST_SENT", "player")
+        pcall(self.RegisterUnitEvent, self, "UNIT_SPELLCAST_START", "player")
         for _, e in ipairs({ "PLAYER_EQUIPMENT_CHANGED", "TRANSMOGRIFY_SUCCESS", "TRANSMOG_COLLECTION_UPDATED",
                              "TRANSMOG_OUTFITS_CHANGED", "PLAYER_ENTERING_WORLD" }) do
             pcall(self.RegisterEvent, self, e)
         end
         if ns.InitOptions then ns.InitOptions() end
     elseif event == "PLAYER_LOGIN" then
-        ns.ApplyMute()
+        ns.ApplyMute(true)
+    elseif event == "UNIT_SPELLCAST_SENT" or event == "UNIT_SPELLCAST_START" then
+        -- early warning that you are about to fire: mute the stock sound first
+        if not db.enabled then return end
+        local spellID
+        if event == "UNIT_SPELLCAST_SENT" then
+            local _, _, _, id = ...
+            spellID = id
+        else
+            local _, _, id = ...
+            spellID = id
+        end
+        if spellID == nil or (issecretvalue and issecretvalue(spellID)) then return end
+        if SHOT_SPELLS[spellID] or db.extraSpells[spellID] then ns.OwnShotMute() end
     elseif event == "PLAYER_EQUIPMENT_CHANGED" or event == "TRANSMOGRIFY_SUCCESS"
         or event == "TRANSMOG_COLLECTION_UPDATED" or event == "TRANSMOG_OUTFITS_CHANGED"
         or event == "PLAYER_ENTERING_WORLD" then
@@ -617,6 +685,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
             ns.Print(("you cast spell %s -> %s"):format(tostring(spellID), isShot and "counts as a shot" or "ignored (use /hws addspell " .. tostring(spellID) .. " if it should play a sound)"))
         end
         if not isShot then return end
+        ns.OwnShotMute()
         local weapon = ns.GetWeaponType()
         if weapon then ns.PlayShotSequence(weapon) end
     end
@@ -681,6 +750,14 @@ SlashCmdList["HUNTERWEAPONSOUNDS"] = function(msg)
             real and ns.WEAPON_LABEL[real]:lower() or "no ranged weapon",
             look and ns.WEAPON_LABEL[look]:lower() or "not transmogged / unknown",
             final and ns.WEAPON_LABEL[final]:lower() or "none"))
+    elseif cmd == "muteall" then
+        if arg == "on" or arg == "off" then
+            db.muteAll = (arg == "on"); ns.ApplyMute(true)
+            ns.Print(db.muteAll and "stock weapon sounds muted for everyone (nearby players go silent)"
+                or "stock weapon sounds muted only around your own shots (other players sound normal)")
+        else
+            ns.Print("usage: /hws muteall on|off")
+        end
     elseif cmd == "minimap" then
         db.minimap.hide = not db.minimap.hide
         if ns.UpdateMinimapButton then ns.UpdateMinimapButton() end
@@ -693,7 +770,7 @@ SlashCmdList["HUNTERWEAPONSOUNDS"] = function(msg)
         end
     else
         ns.Print("/hws  open the menu   |  /hws options  open Options > AddOns page")
-        ns.Print("/hws on | off | test | mute on|off | transmog on|off | type auto|gun|bow|crossbow | detect | report | debug | addspell <id> | removespell <id> | minimap")
+        ns.Print("/hws on | off | test | mute on|off | muteall on|off  transmog on|off | type auto|gun|bow|crossbow | detect | report | debug | addspell <id> | removespell <id> | minimap")
         ns.Print(("status: %s, mute defaults: %s, current weapon: %s"):format(
             db.enabled and "on" or "off", db.mute and "on" or "off",
             (ns.GetWeaponType() or "none"):lower()))

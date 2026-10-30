@@ -173,9 +173,9 @@ local function BuildPanel(parent)
     end)
 
     local cbMute = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
-    cbMute:SetPoint("TOPLEFT", 120, -42)
+    cbMute:SetPoint("TOPLEFT", 150, -66)
     cbMute:SetSize(26, 26)
-    Label(parent, "Mute the game's own gun/bow/crossbow sounds", 148, -47)
+    Label(parent, "Mute the game's own sound on my shots", 178, -71)
     cbMute:SetScript("OnClick", function(self)
         ns.db.mute = self:GetChecked() and true or false
         ns.ApplyMute()
@@ -200,7 +200,7 @@ local function BuildPanel(parent)
     local cbTransmog = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
     cbTransmog:SetPoint("TOPLEFT", 12, -66)
     cbTransmog:SetSize(26, 26)
-    Label(parent, "Follow transmog (sounds match how the weapon looks)", 40, -71)
+    Label(parent, "Follow transmog", 40, -71)
     cbTransmog:SetScript("OnClick", function(self)
         ns.db.useTransmog = self:GetChecked() and true or false
         ns.InvalidateDetectCache()
@@ -225,23 +225,24 @@ local function BuildPanel(parent)
     typeBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     local cbMinimap = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
-    cbMinimap:SetPoint("TOPLEFT", 12, -90)
+    cbMinimap:SetPoint("TOPLEFT", 150, -42)
     cbMinimap:SetSize(26, 26)
-    Label(parent, "Show minimap button", 40, -95)
+    Label(parent, "Show minimap button", 178, -47)
     cbMinimap:SetScript("OnClick", function(self)
         ns.db.minimap.hide = not self:GetChecked()
         ns.UpdateMinimapButton()
     end)
 
+
     -- weapon tabs -------------------------------------------------------
     local tabs = {}
     for i, w in ipairs(ns.WEAPONS) do
         local t = Button(parent, ns.WEAPON_LABEL[w], 110, 24)
-        t:SetPoint("TOPLEFT", 16 + (i - 1) * 114, -130)
+        t:SetPoint("TOPLEFT", 16 + (i - 1) * 114, -106)
         t:SetScript("OnClick", function() p.weapon = w; p.Refresh() end)
         tabs[w] = t
     end
-    local currentLabel = Label(parent, "", PANEL_W - 190, -134, "GameFontNormal")
+    local currentLabel = Label(parent, "", PANEL_W - 190, -110, "GameFontNormal")
 
     -- slot rows -----------------------------------------------------------
     local rows = { shoot = {}, reload = {} }
@@ -294,15 +295,15 @@ local function BuildPanel(parent)
             rows[kind][i] = edit
         end
     end
-    BuildRows("shoot", "Shoot sounds (one is picked at random each shot)", -170)
-    BuildRows("reload", "Reload sounds (one is picked at random after each shot)", -286)
+    BuildRows("shoot", "Shoot sounds (one is picked at random each shot)", -146)
+    BuildRows("reload", "Reload sounds (one is picked at random after each shot)", -262)
 
     -- delay / reset / test ----------------------------------------------
-    Label(parent, "Reload plays", 24, -410)
+    Label(parent, "Reload plays", 24, -386)
     local delayEdit = EditBox(parent, 44)
-    delayEdit:SetPoint("TOPLEFT", 100, -406)
+    delayEdit:SetPoint("TOPLEFT", 100, -382)
     delayEdit:SetJustifyH("CENTER")
-    Label(parent, "seconds after the shot (0 - 3)", 152, -410)
+    Label(parent, "seconds after the shot (0 - 3)", 152, -386)
     local function CommitDelay()
         if not ns.SetDelay(p.weapon, delayEdit:GetText()) then
             ns.Print("Enter a number of seconds, for example 0.45")
@@ -314,7 +315,7 @@ local function BuildPanel(parent)
     delayEdit:SetScript("OnEscapePressed", function(self) self:ClearFocus(); p.Refresh() end)
 
     local testBtn = Button(parent, "Test shoot + reload", 140)
-    testBtn:SetPoint("TOPLEFT", 326, -406)
+    testBtn:SetPoint("TOPLEFT", 326, -382)
     testBtn:SetScript("OnClick", function() ns.TestWeapon(p.weapon) end)
     local resetBtn = Button(parent, "Reset to defaults", 110)
     resetBtn:SetPoint("LEFT", testBtn, "RIGHT", 4, 0)
@@ -325,22 +326,22 @@ local function BuildPanel(parent)
     end)
 
     -- custom sounds -------------------------------------------------------
-    Label(parent, "Add a custom sound", 16, -450, "GameFontNormal")
+    Label(parent, "Add a custom sound", 16, -426, "GameFontNormal")
     local note = Label(parent,
         "1) Copy your .ogg or .mp3 file into  Interface\\AddOns\\HunterWeaponSounds\\CustomSounds\\  and restart the game once.\n" ..
         "2) Type its file name below (for example  mygun.ogg ) or a game sound ID, then press Add.\n" ..
         "3) Pick it for any slot with the List button.",
-        24, -472, "GameFontHighlightSmall")
+        24, -448, "GameFontHighlightSmall")
     note:SetWidth(PANEL_W - 48)
     note:SetJustifyH("LEFT")
 
     local addEdit = EditBox(parent, 310)
-    addEdit:SetPoint("TOPLEFT", 26, -522)
+    addEdit:SetPoint("TOPLEFT", 26, -498)
     local addBtn = Button(parent, "Add", 60)
     addBtn:SetPoint("LEFT", addEdit, "RIGHT", 8, 0)
     local addTest = Button(parent, "Play", 60)
     addTest:SetPoint("LEFT", addBtn, "RIGHT", 4, 0)
-    local status = Label(parent, "", 24, -548, "GameFontHighlightSmall")
+    local status = Label(parent, "", 24, -524, "GameFontHighlightSmall")
     status:SetWidth(PANEL_W - 48)
     status:SetJustifyH("LEFT")
 
@@ -440,7 +441,7 @@ end
 local window
 local function BuildWindow()
     window = CreateFrame("Frame", "HunterWeaponSoundsWindow", UIParent, "BackdropTemplate")
-    window:SetSize(PANEL_W, 580)
+    window:SetSize(PANEL_W, 556)
     window:SetPoint("CENTER")
     window:SetFrameStrata("DIALOG")
     window:SetMovable(true)
