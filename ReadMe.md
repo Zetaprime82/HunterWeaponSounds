@@ -15,7 +15,7 @@ Features :
 
 Opening the menu :
 --------------------
-- Type `/hws` to open the scale menu.
+- Type `/hws` to open the menu.
 - Go to Options → AddOns → Hunter Weapon Sounds
 - Click the minimap button (left-click opens the menu, right-click turns the addon on or off, drag to move it)
 
