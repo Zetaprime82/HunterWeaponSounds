@@ -2,6 +2,8 @@
 
 *Give your hunter’s guns, bows and crossbows a new sound.*
 
+The game’s own weapon sounds are muted so you only hear the addon’s sounds, and that also quiets other players’ weapons.
+
 Features :
 -----------------
 - Gun, Bow and Crossbow each have their own 3 shoot sounds and 3 reload sounds.
