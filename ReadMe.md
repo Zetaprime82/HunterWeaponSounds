@@ -1,5 +1,5 @@
 # Hunter Weapon Sounds
-Formerly known as Gun Silencer, Suppressor, Crossbow and Bow Sound Pack
+
 *Give your hunter’s guns, bows and crossbows a new sound. Hunter Weapon Sounds replaces the shoot and reload sounds of your ranged weapon with 3 shoot sounds and 3 reload sounds for each weapon type. A built-in menu lets you change every sound, and you can add your own.*
 
 Features :
