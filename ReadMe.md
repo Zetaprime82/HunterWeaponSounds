@@ -36,7 +36,7 @@ Using the menu :
 
 Adding your own sounds :
 --------------------
-1. Copy your .ogg or .mp3 file into HunterWeaponSounds\CustomSounds\.
+1. Copy your `.ogg` or `.mp3` file into `HunterWeaponSounds\CustomSounds\`.
 2. Restart the game fully. WoW only sees new files when it starts, so /reload is not enough.
 3. In the menu, type the file name under Add a custom sound and press Add.
 4. Pick it for any slot with the List button. Custom sounds can be removed from the list with the red X.
